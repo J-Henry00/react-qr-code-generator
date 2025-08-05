@@ -1,0 +1,26 @@
+{
+    "name": "QR Code Generator",
+    "short_name": "QR Generátor",
+    "description": "Snadno vytvořte QR kódy pro různé účely, včetně URL, Wi-Fi, e-mailů a dalších.",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#111827",
+    "theme_color": "#1d4ed8",
+    "icons": [
+      {
+        "src": "/android-chrome-192x192.png",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "/android-chrome-512x512.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      },
+      {
+        "src": "/icon.svg",
+        "sizes": "any",
+        "type": "image/svg+xml"
+      }
+    ]
+  }

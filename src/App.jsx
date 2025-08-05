@@ -1,49 +1,47 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { QRCodeCanvas } from 'qrcode.react'; // Named import for QRCode
-import { saveAs } from 'file-saver'; // Library for saving files
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'; // For icons
-// Added faBars and faTimes for hamburger menu
+import { QRCodeCanvas } from 'qrcode.react';
+import { saveAs } from 'file-saver';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faWifi, faEnvelope, faPhone, faSms, faMapMarkerAlt, faCalendarAlt, faLink, faBars, faTimes } from '@fortawesome/free-solid-svg-icons';
 import './App.css';
 
-// Environment variable for initial URL. In a real app, this would be loaded from .env
 const initialUrl = import.meta.env.VITE_INITIAL_QR_URL || 'https://www.google.com';
 
 const App = () => {
-    // State for the main text input QR code content
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('Service Worker registration failed:', err);
+                    });
+            });
+        }
+    }, []);
+
     const [qrText, setQrText] = useState('');
-    // State for the QR code content from the "Create Other" modal
     const [modalQrContent, setModalQrContent] = useState('');
-    // State to control the visibility of the "Create Other" modal
     const [showModal, setShowModal] = useState(false);
-    // State to store the selected QR code type (e.g., 'text', 'wifi', 'email')
     const [qrType, setQrType] = useState('text');
-    // State for the download options modal
     const [showDownloadOptions, setShowDownloadOptions] = useState(false);
-    // State for the QR code data URL (used for downloading and copying URL)
     const [qrDataUrl, setQrDataUrl] = useState('');
-    // Ref to the QR code canvas element
     const qrCodeRef = useRef(null);
-    // State for specific form data for different QR code types
     const [wifiData, setWifiData] = useState({ ssid: '', password: '', encryption: 'WPA/WPA2' });
     const [emailData, setEmailData] = useState({ to: '', subject: '', body: '' });
     const [phoneData, setPhoneData] = useState('');
     const [smsData, setSmsData] = useState({ number: '', message: '' });
     const [geoData, setGeoData] = useState({ latitude: '', longitude: '' });
     const [eventData, setEventData] = useState({ title: '', location: '', start: '', end: '' });
-
-    // New state for controlling the visibility of the side menu (hamburger menu) in the modal
     const [showSideMenu, setShowSideMenu] = useState(false);
-
-    // Debounce timer for QR code generation
     const debounceTimeoutRef = useRef(null);
 
-    // Effect to generate initial URL QR code when the component mounts
     useEffect(() => {
         setQrText(initialUrl);
     }, []);
 
-    // Effect to update the QR code data URL whenever qrText or modalQrContent changes
     useEffect(() => {
         const canvas = qrCodeRef.current?.querySelector('canvas');
         if (canvas) {
@@ -51,23 +49,44 @@ const App = () => {
         }
     }, [qrText, modalQrContent]);
 
-    // Debounced function to update the QR code based on user input
+    // useEffect pro zavírání modálního okna pomocí ESC
+    useEffect(() => {
+        const handleEsc = (event) => {
+            if (event.key === 'Escape') {
+                if (showDownloadOptions) {
+                    setShowDownloadOptions(false);
+                } else if (showModal) {
+                    setShowModal(false);
+                }
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+        return () => {
+            document.removeEventListener('keydown', handleEsc);
+        };
+    }, [showModal, showDownloadOptions]);
+
     const handleQrTextChange = (e) => {
         const text = e.target.value;
         setQrText(text);
 
-        // Clear previous debounce timeout
         if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
         }
 
-        // Set a new debounce timeout
         debounceTimeoutRef.current = setTimeout(() => {
-            // No explicit action needed here as `qrText` state change will trigger QR code re-render
-        }, 500); // 500ms delay
+        }, 500);
     };
 
-    // Function to generate content for different QR code types
+    // NOVÉ: Handler pro zavírání modálního okna při kliknutí na pozadí
+    const handleBackdropClick = (event) => {
+        // Zkontrolujeme, zda bylo kliknuto přímo na prvek s id="modal-backdrop"
+        // a ne na žádný z jeho potomků
+        if (event.target.id === 'modal-backdrop') {
+            setShowModal(false);
+        }
+    };
+
     const generateQrContent = useCallback(() => {
         let content = '';
         switch (qrType) {
@@ -90,21 +109,19 @@ const App = () => {
                 content = `geo:${geoData.latitude},${geoData.longitude}`;
                 break;
             case 'event': {
-                // Check if dates are valid before converting to ISO string
                 let startDate = new Date(eventData.start);
                 let endDate = new Date(eventData.end);
 
                 let formattedStartDate = '';
-                if (!isNaN(startDate.getTime())) { // Check if date is valid
+                if (!isNaN(startDate.getTime())) {
                     formattedStartDate = startDate.toISOString().replace(/[-:]|\.\d{3}/g, '');
                 }
 
                 let formattedEndDate = '';
-                if (!isNaN(endDate.getTime())) { // Check if date is valid
+                if (!isNaN(endDate.getTime())) {
                     formattedEndDate = endDate.toISOString().replace(/[-:]|\.\d{3}/g, '');
                 }
 
-                // Construct content, only include date fields if they are valid
                 content = `BEGIN:VEVENT\nSUMMARY:${eventData.title}\nLOCATION:${eventData.location}`;
                 if (formattedStartDate) {
                     content += `\nDTSTART:${formattedStartDate}`;
@@ -121,12 +138,10 @@ const App = () => {
         setModalQrContent(content);
     }, [qrType, qrText, wifiData, emailData, phoneData, smsData, geoData, eventData]);
 
-    // Effect to regenerate QR content when type or data changes
     useEffect(() => {
         generateQrContent();
     }, [qrType, wifiData, emailData, phoneData, smsData, geoData, eventData, generateQrContent]);
 
-    // Function to handle downloading the QR code
     const handleDownload = (format) => {
         const canvas = qrCodeRef.current?.querySelector('canvas');
         if (canvas) {
@@ -144,19 +159,18 @@ const App = () => {
             } else if (format === 'jpeg') {
                 canvas.toBlob((blob) => {
                     saveAs(blob, `${filename}.jpg`);
-                }, 'image/jpeg', 0.9); // 0.9 quality for JPEG
+                }, 'image/jpeg', 0.9);
             } else if (format === 'svg') {
-                // For SVG, we need to manually create the SVG string
                 const svgString = `
                     <svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                         <rect width="100%" height="100%" fill="#FFFFFF"/>
                         ${Array.from(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data)
-                            .filter((_, i) => (i + 1) % 4 !== 0) // Filter out alpha channel
+                            .filter((_, i) => (i + 1) % 4 !== 0)
                             .reduce((acc, val, i) => {
-                                if (i % 3 === 0) { // Red channel
+                                if (i % 3 === 0) {
                                     const x = (i / 3) % canvas.width;
                                     const y = Math.floor((i / 3) / canvas.width);
-                                    if (val === 0) { // Black pixel
+                                    if (val === 0) {
                                         acc.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="#000000"/>`);
                                     }
                                 }
@@ -168,28 +182,25 @@ const App = () => {
                 saveAs(blob, `${filename}.svg`);
             }
         }
-        setShowDownloadOptions(false); // Close download options after selection
+        setShowDownloadOptions(false);
     };
 
-    // Function to copy the QR code data URL to clipboard
     const handleCopyUrl = () => {
         if (qrDataUrl) {
-            // Use document.execCommand for better compatibility in iframes
             const textarea = document.createElement('textarea');
             textarea.value = qrDataUrl;
             document.body.appendChild(textarea);
             textarea.select();
             document.execCommand('copy');
             document.body.removeChild(textarea);
-            alert('URL zkopírována do schránky!'); // Simple alert, replace with custom modal if needed
+            alert('URL zkopírována do schránky!');
         }
-        setShowDownloadOptions(false); // Close download options after selection
+        setShowDownloadOptions(false);
     };
 
-    // Render function for the "Create Other" modal content based on qrType
     const renderModalContent = () => {
         switch (qrType) {
-            case 'text': // Added case for 'text' type in modal
+            case 'text':
                 return (
                     <div className="space-y-4">
                         <h3 className="text-xl font-semibold text-gray-800">Text / URL</h3>
@@ -199,8 +210,8 @@ const App = () => {
                                 id="modalQrText"
                                 rows="5"
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                value={qrText} // Synchronized with main qrText state
-                                onChange={handleQrTextChange} // Uses the same handler for debounce
+                                value={qrText}
+                                onChange={handleQrTextChange}
                                 placeholder="Zde napište zprávu nebo vložte URL odkaz."
                             ></textarea>
                         </div>
@@ -413,10 +424,8 @@ const App = () => {
     };
 
     return (
-        // Main application container - changed to flex-col and added padding for scrolling
         <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-start p-4 font-inter overflow-y-auto">
             <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-gray-700 mb-8">
-                {/* QR Code display area */}
                 <div className="bg-gray-700 p-4 rounded-xl flex justify-center items-center mb-6 border border-gray-600" ref={qrCodeRef}>
                     <QRCodeCanvas
                         value={qrType === 'text' ? qrText : modalQrContent}
@@ -428,7 +437,6 @@ const App = () => {
                     />
                 </div>
 
-                {/* Text input area */}
                 <div className="bg-gray-700 p-4 rounded-xl mb-6 border border-gray-600">
                     <textarea
                         className="w-full h-32 p-3 bg-gray-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-gray-400 resize-none"
@@ -438,7 +446,6 @@ const App = () => {
                     ></textarea>
                 </div>
 
-                {/* Action buttons */}
                 <div className="flex justify-between space-x-4 mb-6">
                     <button
                         onClick={() => setShowDownloadOptions(true)}
@@ -449,8 +456,8 @@ const App = () => {
                     <button
                         onClick={() => {
                             setShowModal(true);
-                            setQrType('wifi'); // Default to Wifi when opening modal
-                            generateQrContent(); // Generate content for the default type
+                            setQrType('wifi');
+                            generateQrContent();
                         }}
                         className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-105 border border-indigo-500"
                     >
@@ -459,20 +466,17 @@ const App = () => {
                 </div>
             </div>
 
-            {/* "Create Other" Modal */}
             {showModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 backdrop-blur-sm overflow-y-auto p-4">
+                // NOVÉ: Přidán id="modal-backdrop" a onClick handler pro zavření modálního okna
+                <div id="modal-backdrop" onClick={handleBackdropClick} className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 backdrop-blur-sm overflow-y-auto p-4">
                     <div className="bg-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col md:flex-row relative">
-                        {/* Hamburger icon for mobile, visible only on small screens */}
                         <div className={`md:hidden absolute top-4 left-4 z-20 ${showSideMenu ? 'hidden' : ''}`}>
                             <button onClick={() => setShowSideMenu(!showSideMenu)} className="text-white text-2xl p-2 rounded-lg bg-gray-700 hover:bg-gray-600">
                                 <FontAwesomeIcon icon={faBars} />
                             </button>
                         </div>
 
-                        {/* Left sidebar for QR code type selection (responsive) */}
                         <div className={`fixed inset-0 bg-gray-700 z-10 p-4 transform transition-transform duration-300 ease-in-out ${showSideMenu ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 md:w-1/3 md:rounded-xl md:mb-0 md:mr-4 md:border md:border-gray-600`}>
-                            {/* Close button for hamburger menu on mobile */}
                             <div className="md:hidden absolute top-4 right-4">
                                 <button onClick={() => setShowSideMenu(false)} className="text-white text-2xl p-2 rounded-lg bg-gray-800 hover:bg-gray-900">
                                     <FontAwesomeIcon icon={faTimes} />
@@ -530,7 +534,7 @@ const App = () => {
                                 </li>
                                 <li>
                                     <button
-                                        onClick={() => { setQrType('text'); setShowSideMenu(false); }} // Option to go back to simple text
+                                        onClick={() => { setQrType('text'); setShowSideMenu(false); }}
                                         className={`w-full text-left py-2 px-3 rounded-lg transition duration-200 ease-in-out ${qrType === 'text' ? 'bg-indigo-600 text-white' : 'bg-gray-600 text-gray-200 hover:bg-gray-500'}`}
                                     >
                                         <FontAwesomeIcon icon={faLink} className="mr-2" /> Text/URL
@@ -539,14 +543,12 @@ const App = () => {
                             </ul>
                         </div>
 
-                        {/* Right content area for dynamic forms and QR code preview */}
                         <div className="flex-1 bg-gray-700 p-6 rounded-xl border border-gray-600 flex flex-col z-0">
                             <h2 className="text-xl font-bold text-green-400 mb-4">Obsah, který se vloží do QR kódu</h2>
                             <div className="flex-1 mb-6">
                                 {renderModalContent()}
                             </div>
 
-                            {/* QR code preview in modal */}
                             <div className="bg-gray-600 p-4 rounded-xl flex justify-center items-center mb-6 border border-gray-500" ref={qrCodeRef}>
                                 <QRCodeCanvas
                                     value={modalQrContent}
@@ -558,7 +560,6 @@ const App = () => {
                                 />
                             </div>
 
-                            {/* Download button in modal */}
                             <button
                                 onClick={() => setShowDownloadOptions(true)}
                                 className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-105 border border-green-500 mb-4"
@@ -566,18 +567,16 @@ const App = () => {
                                 Stáhnout QR Kód
                             </button>
 
-                            {/* Close modal button */}
                             <button
                                 onClick={() => {
                                     setShowModal(false);
-                                    setQrType('text'); // Reset qrType to 'text' when closing the modal
+                                    setQrType('text');
                                 }}
                                 className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition duration-300 ease-in-out transform hover:scale-105"
                             >
                                 Zavřít
                             </button>
 
-                            {/* Download Options Modal - MOVED HERE to appear on top of this modal */}
                             {showDownloadOptions && (
                                 <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 backdrop-blur-sm">
                                     <div className="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 w-full max-w-sm text-center">
