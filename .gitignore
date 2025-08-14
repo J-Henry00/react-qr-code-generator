@@ -23,5 +23,10 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environmental Files
+.env
+.env.local
+.env.development
+
 # Custom files
 gemini-chat.txt

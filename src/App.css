@@ -7,7 +7,7 @@
 /* Basic styles for the body and root element */
 body {
     margin: 0;
-    font-family: 'Inter', sans-serif; /* Použití fontu Inter */
+    font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -28,7 +28,7 @@ body {
 }
 
 /* Apply the animation to the green download buttons */
-.bg-green-600.hover\:bg-green-700.text-white.font-bold.py-3.px-4.rounded-xl.shadow-lg.transition.duration-300.ease-in-out.transform.hover\:scale-105.border.border-green-500.mb-4,
-.flex-1.bg-green-600.hover\:bg-green-700.text-white.font-bold.py-3.px-4.rounded-xl.shadow-lg.transition.duration-300.ease-in-out.transform.hover\:scale-105.border.border-green-500 {
-    animation: pulse-fade 2s infinite ease-in-out; /* 2s duration, infinite, ease-in-out timing */
+/* POZOR: Toto je důležité. Animace je aplikována na třídy. Pokud se třídy tlačítek změní, je potřeba upravit i tento selektor. */
+.bg-green-600 {
+    animation: pulse-fade 2s infinite ease-in-out;
 }
